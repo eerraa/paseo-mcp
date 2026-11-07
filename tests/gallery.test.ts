@@ -10,7 +10,7 @@ import { CURATED_CATALOG } from "../shared/catalog-curated";
 import type { Destination, McpAuthAccount, McpHealth, McpServerRow } from "../shared/contracts";
 import { COPY_ALL_EXPLAINER, COPY_ALL_LABEL } from "../shared/copy-all";
 import { MCP_EXPLAINER, MCP_LEARN_MORE } from "../shared/overview";
-import { appsLine, healthPlainWord, joinWords, serverDescription, serverGallery, signInLine, SERVER_FILTERS } from "../shared/servers";
+import { appsLine, healthPlainWord, isAppGap, joinWords, serverDescription, serverGallery, signInLine, SERVER_FILTERS } from "../shared/servers";
 
 const HOME = "/home/demo";
 const dest = (id: string, provider: string, account: string): Destination => ({
@@ -144,6 +144,17 @@ test("card words: a sign-in connector's 401 reads from the accounts, not as a si
   assert.equal(byName.get("exa")?.healthWord, "Uses sign-in", "no account reports a grant either way");
   assert.equal(byName.get("exa")?.signInText, "Sign-in kept by your AI app", "never 'No sign-in needed' for a 401");
   assert.equal(galleryFor("all").cards.find((card) => card.name === "jam")?.healthWord, "Needs sign-in", "an account still waiting keeps the word");
+});
+
+test("gaps: a 'just for you' copy only is no gap, so the Overview and the Connectors filter count the same", () => {
+  const localOnly: McpServerRow = { ...row("kicad", "python kct_mcp.py", []), localIn: [{ destId: claude.id, project: "/home/demo/kicad" }] };
+  assert.equal(isAppGap(localOnly, destinations.length), false);
+  assert.equal(isAppGap(servers[1]!, destinations.length), true, "in some apps, not all");
+  assert.equal(isAppGap(servers[0]!, destinations.length), false, "in every app");
+  const withLocal = serverGallery({ servers: [...servers, localOnly], destinations, health, accounts, authRead: true, known: [], filter: "all", query: "" });
+  const overviewGaps = [...servers, localOnly].filter((server) => isAppGap(server, destinations.length)).length;
+  assert.equal(withLocal.counts.gaps, overviewGaps);
+  assert.equal(withLocal.counts.gaps, 3, "acme, jam, supabase; not kicad");
 });
 
 test("program check: a Windows absolute path with backslashes is a file, not a PATH name", { skip: process.platform !== "win32" }, async () => {

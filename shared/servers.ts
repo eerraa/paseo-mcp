@@ -38,6 +38,15 @@ export function accountsNeedingSignIn(name: string, accounts: readonly McpAuthAc
 
 export type ServerFilter = "all" | "gaps" | "issues" | "sign-in";
 
+/**
+ * Missing from some apps: in at least one app's own settings but not in all.
+ * A "just for you" copy only (0.20.0) is in no app on purpose: not a gap.
+ * The Connectors filter, the Overview row and the header count all use this.
+ */
+export function isAppGap(server: Pick<McpServerRow, "presentIn">, destinationCount: number): boolean {
+  return server.presentIn.length > 0 && server.presentIn.length < destinationCount;
+}
+
 export function serverMatches(
   server: McpServerRow,
   options: {
@@ -57,8 +66,7 @@ export function serverMatches(
   }
   switch (options.filter) {
     case "gaps":
-      // A "just for you" copy only (0.20.0) is in no app on purpose: not a gap.
-      return server.presentIn.length > 0 && server.presentIn.length < options.destinationCount;
+      return isAppGap(server, options.destinationCount);
     case "issues":
       return Boolean(options.health && healthNeedsAttention(options.health.status));
     case "sign-in":

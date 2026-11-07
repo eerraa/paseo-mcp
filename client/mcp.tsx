@@ -37,7 +37,7 @@ import { clockTime } from "../shared/schedule";
 import { ownedFromRow } from "../shared/catalog";
 import { CURATED_CATALOG } from "../shared/catalog-curated";
 import { BUILT_IN_LABEL, BUILT_IN_NOTE } from "../shared/builtin";
-import { SERVER_FILTERS, appsLine, healthPlainNote, localRemoveCommand, projectFilesFor, providerName, removePlan, serverGallery, signInState, type RemovePlan, type RemoveScope, type ServerCardModel, type ServerFilter } from "../shared/servers";
+import { SERVER_FILTERS, appsLine, healthPlainNote, isAppGap,localRemoveCommand, projectFilesFor, providerName, removePlan, serverGallery, signInState, type RemovePlan, type RemoveScope, type ServerCardModel, type ServerFilter } from "../shared/servers";
 import { COPY_ALL_EXPLAINER, COPY_ALL_LABEL } from "../shared/copy-all";
 import { overviewNextStep, overviewVerdict, type OverviewTarget } from "../shared/overview";
 import { HELP_QUESTIONS, HOW_IT_WORKS_QUESTION, MCP_NAME, MCP_NAME_LOWER, PROJECTS_LINE, WHAT_CONNECTORS_ARE, type HelpTarget } from "../shared/guide";
@@ -1706,7 +1706,7 @@ function McpBody({
   // 0.19.2: tools that come with the Codex app are listed on their own and never counted: not as broken, missing or to sign in to.
   const ownServers = servers.filter((server) => !server.builtIn && !health?.get(server.name)?.builtIn);
   const builtInServers = servers.filter((server) => !ownServers.includes(server));
-  const gapServers = ownServers.filter((server) => server.presentIn.length < destinations.length);
+  const gapServers = ownServers.filter((server) => isAppGap(server, destinations.length));
   const isIssue = (server: McpServerRow) => {
     const entry = health?.get(server.name);
     return Boolean(entry && resultNeedsAttention(entry));
