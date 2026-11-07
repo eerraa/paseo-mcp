@@ -1215,7 +1215,7 @@ function ServerGalleryCard({ card, checking, onOpen }: { card: ServerCardModel; 
         <IconButton icon="ChevronRight" label={`Open ${card.name}`} onPress={onOpen} />
       </View>
       <View style={{ gap: t.space.xs }}>
-        <StatusPill status={waiting ? "busy" : card.health ? healthStatus(card.health) : "neutral"} label={waiting ? "Checking…" : card.healthWord} />
+        <StatusPill status={waiting ? "busy" : card.health === "auth-required" && card.signIn === "connected" ? "ok" : card.health ? healthStatus(card.health) : "neutral"} label={waiting ? "Checking…" : card.healthWord} />
         <Text numberOfLines={2} style={{ ...TYPE.secondary, color: card.missing > 0 ? t.color.warning : t.color.fg }}>{card.apps}</Text>
         <Text numberOfLines={1} style={{ ...TYPE.secondary, color: card.signIn === "needs" ? t.color.warning : t.color.fg }}>{card.signInText}</Text>
         {card.alsoIn ? <Text numberOfLines={2} style={{ ...TYPE.secondary, color: t.color.muted }}>{card.alsoIn}</Text> : null}

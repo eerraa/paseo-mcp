@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, extname, join } from "node:path";
 import { onStart } from "./lifecycle";
 import { runFile } from "./run";
 
@@ -60,14 +60,26 @@ export function searchPath(): string[] {
 /** Absolute path of an executable on the search path, or "". */
 export function findOnPath(name: string): string {
   for (const directory of searchPath()) {
-    const candidate = join(directory, name);
-    if (existsSync(candidate)) return candidate;
+    for (const suffix of executableSuffixes(name)) {
+      const candidate = join(directory, name + suffix);
+      if (existsSync(candidate)) return candidate;
+    }
   }
   return "";
 }
 
+/**
+ * Windows runs only files with a PATHEXT extension; an extensionless npm shim
+ * (a sh script beside `codex.cmd`) is not executable there.
+ */
+function executableSuffixes(name: string): string[] {
+  if (process.platform !== "win32" || extname(name)) return [""];
+  return (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean);
+}
+
 export function binaryOnPath(command: string): boolean {
-  if (command.includes("/")) return existsSync(command);
+  // Windows absolute paths use backslashes (`D:\Apps\tool.exe`).
+  if (command.includes("/") || command.includes("\\")) return executableSuffixes(command).some((suffix) => existsSync(command + suffix));
   return findOnPath(command) !== "";
 }
 

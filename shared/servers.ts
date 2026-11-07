@@ -192,6 +192,12 @@ export function healthPlainNote(status: McpHealthStatus | undefined): string {
   }
 }
 
+/** The health word for a sign-in connector, from the accounts rather than the anonymous probe (as the agent panel does). */
+export function signInWord(signIn: SignIn): string {
+  if (signIn === "needs") return "Needs sign-in";
+  return signIn === "connected" ? "Signed in" : "Uses sign-in";
+}
+
 /** The sign-in state in words. `authRead`: the sign-in state has been read at least once. */
 export function signInLine(
   server: Pick<McpServerRow, "transport" | "inlineCredentialsIn">,
@@ -274,11 +280,15 @@ export function serverGallery(input: {
       name: server.name,
       description,
       health: health?.status,
-      healthWord: healthPlainWord(health?.status),
+      // A 401 is how a working sign-in connector answers the anonymous check; the accounts say whether it is signed in.
+      healthWord: health?.status === "auth-required" ? signInWord(signIn) : healthPlainWord(health?.status),
       apps: apps.line,
       missing: apps.missing,
       signIn,
-      signInText: signInLine(server, signIn, accountsNeedingSignIn(server.name, input.accounts).length, input.authRead),
+      signInText:
+        health?.status === "auth-required" && signIn === "none"
+          ? "Sign-in kept by your AI app"
+          : signInLine(server, signIn, accountsNeedingSignIn(server.name, input.accounts).length, input.authRead),
       alsoIn: alsoInProjects(
         (input.projectServers ?? []).filter((entry) => entry.name === server.name).map((entry) => entry.project),
         (server.localIn ?? []).map((entry) => lastSegment(entry.project)),

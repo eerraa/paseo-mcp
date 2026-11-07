@@ -2,6 +2,11 @@ import { spawn } from "node:child_process";
 
 export type RunResult = { code: number | null; stdout: string; stderr: string; timedOut: boolean };
 
+/** One cmd.exe argument: plain words stay bare, anything else is double-quoted with its quotes doubled. */
+function cmdQuote(value: string): string {
+  return /^[\w.:\\/=-]+$/.test(value) ? value : `"${value.replace(/"/g, '""')}"`;
+}
+
 /**
  * Run a program without blocking the plugin's event loop. Output is captured,
  * never passed through to the plugin log (a CLI's warnings would otherwise
@@ -27,7 +32,13 @@ export function runFile(
       done(result);
     };
     let killer: ReturnType<typeof setTimeout> | undefined;
-    const child = spawn(file, args, { env: options.env, cwd: options.cwd, stdio: ["ignore", "pipe", "pipe"] });
+    // Windows starts .cmd/.bat shims (npm's `codex.cmd`) only through cmd.exe, which takes one quoted command line.
+    const viaCmd = process.platform === "win32" && /\.(cmd|bat)$/i.test(file);
+    const child = spawn(
+      viaCmd ? process.env.ComSpec || "cmd.exe" : file,
+      viaCmd ? ["/d", "/s", "/c", `"${[file, ...args].map(cmdQuote).join(" ")}"`] : args,
+      { env: options.env, cwd: options.cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, windowsVerbatimArguments: viaCmd },
+    );
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGTERM");

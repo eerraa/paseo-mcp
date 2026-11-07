@@ -132,6 +132,28 @@ test("card words: health in a word or two, sign-in in plain words", () => {
   assert.equal(cards.get("jam")?.missing, 2);
 });
 
+test("card words: a sign-in connector's 401 reads from the accounts, not as a sign-in still owed", () => {
+  const oauth = [row("ctx", "https://mcp.ctx.example/mcp", [claude.id, codex.id]), row("exa", "https://mcp.exa.example/mcp", [codex.id])];
+  const probes = new Map<string, McpHealth>([check("ctx", "auth-required", "HTTP 401"), check("exa", "auth-required", "HTTP 401")]);
+  const signedIn = [account("claude", "demo@example.com", [], {}), account("codex", "demo@example.com", [], { ctx: "connected" })];
+  const byName = new Map(
+    serverGallery({ servers: oauth, destinations, health: probes, accounts: signedIn, authRead: true, known: [], filter: "all", query: "" }).cards.map((card) => [card.name, card]),
+  );
+  assert.equal(byName.get("ctx")?.healthWord, "Signed in");
+  assert.equal(byName.get("ctx")?.signInText, "Signed in");
+  assert.equal(byName.get("exa")?.healthWord, "Uses sign-in", "no account reports a grant either way");
+  assert.equal(byName.get("exa")?.signInText, "Sign-in kept by your AI app", "never 'No sign-in needed' for a 401");
+  assert.equal(galleryFor("all").cards.find((card) => card.name === "jam")?.healthWord, "Needs sign-in", "an account still waiting keeps the word");
+});
+
+test("program check: a Windows absolute path with backslashes is a file, not a PATH name", { skip: process.platform !== "win32" }, async () => {
+  const { binaryOnPath, findOnPath } = await import("../server/path");
+  assert.equal(binaryOnPath(process.execPath), true);
+  assert.equal(binaryOnPath(process.execPath.replace(/\.exe$/i, "")), true, "PATHEXT completes the extension");
+  assert.equal(binaryOnPath("C:\\definitely\\missing\\tool.exe"), false);
+  assert.match(findOnPath("node"), /\.(exe|cmd)$/i, "never an extensionless shim Windows can't run");
+});
+
 // ------------------------------------------------------------------ Add gallery
 
 const cards: CatalogCard[] = CURATED_CATALOG.slice(0, 14).map(curatedCard);

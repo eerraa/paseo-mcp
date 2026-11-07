@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **Windows: a program given by its full path showed as "Not installed".** `D:\Apps\tool\tool.exe` has no `/`, so it was looked up as a name on PATH. Backslash paths are now checked as files, and PATH lookups try the PATHEXT extensions instead of matching npm's extensionless sh shim.
+- **Windows: Codex sign-ins were never read.** The plugin found npm's `codex` sh shim, which Windows can't run, so every Codex sign-in read failed. It now runs `codex.cmd` through `cmd.exe /d /s /c` with quoted arguments.
+- **A signed-in sign-in connector's card said "Needs sign-in" above "No sign-in needed".** The health check is anonymous, so every sign-in connector answers 401. The card's word now comes from the accounts, as the agent panel's already did: "Signed in", "Needs sign-in", or "Uses sign-in", with "Sign-in kept by your AI app" when no account reports either way.
+
 ## 0.20.1 — 2026-10-14
 
 The user: "I can't sign into multiple agents. It's just Codex… what happened to the ability to sync them across providers? Did they even work in the first place?" Found on paseo-ankit, and fixed.
