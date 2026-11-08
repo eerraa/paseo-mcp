@@ -770,6 +770,8 @@ AgentLink is optional. Standard `~/.claude`, `~/.codex`, `~/.kimi-code`, and `~/
 
 When [AgentLink](https://github.com/itsjustanks/agent-link) account directories exist under `~/.agent-link` or `~/.agent-auth`, Paseo MCP discovers them automatically. It also reads hand-managed `~/.claude-accounts` and `~/.codex-accounts` directories. OAuth remains per account and is never copied.
 
+Connector sign-ins are independent of model authentication. Codex configured with an API key or a local router is included even without a ChatGPT email. Enabled Paseo profiles that extend Claude or Codex and set their own `CLAUDE_CONFIG_DIR` or `CODEX_HOME` are checked separately, using that directory's connector grants.
+
 ## Development
 
 ```sh

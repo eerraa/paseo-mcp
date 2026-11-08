@@ -72,7 +72,7 @@ import { CopyAllPanel } from "./copy-all";
 import { ServerHealthTag, healthCheckedLabel, healthStatus, healthWord, splitIssues, useHealth } from "./health";
 import { setSignInFocus, useSignInFocus } from "./focus";
 import { canOpenMcp, canSyncTab, openMcp, openMcpAdd, syncTab, takePendingAdd, takePendingServer, type AddStart } from "./navigate";
-import { loginCommand } from "../shared/accounts";
+import { accountMatchesDestination, loginCommand } from "../shared/accounts";
 import { GuideParts, OverviewGuide } from "./guide";
 import { useOpenLink } from "./links";
 import { AskAgentButton } from "./ask";
@@ -662,7 +662,7 @@ function AuthRows({
   onComplete: (key: string, redirectUrl: string) => void;
   onCopied: (ok: boolean) => void;
   bare?: boolean;
-  onlyAccount?: { provider: string; email: string };
+  onlyAccount?: { provider: string; email: string; dir?: string };
 }) {
   const t = useTokens();
   const openLinkInBrowser = useOpenLink();
@@ -670,10 +670,10 @@ function AuthRows({
   const rows = accounts
     .filter(
       (account) =>
-        !onlyAccount || (account.provider === onlyAccount.provider && account.email === onlyAccount.email),
+        !onlyAccount || (account.provider === onlyAccount.provider && account.email === onlyAccount.email && (!onlyAccount.dir || account.dir === onlyAccount.dir)),
     )
     .map((account) => {
-      const dest = destinations.find((entry) => entry.provider === account.provider && entry.account === account.email);
+      const dest = destinations.find((entry) => accountMatchesDestination(account, entry));
       const state = oauthState(account, server);
       const session = sessions.find(
         (entry) =>
@@ -1740,7 +1740,7 @@ function McpBody({
   const rawRows: RawDefRow[] = rawQuery.data?.rows ?? [];
   const defRows: McpDefRow[] = defQuery.data?.rows ?? [];
   const accountForDestination = (dest: Destination) =>
-    accounts.find((account) => account.provider === dest.provider && account.email === dest.account);
+    accounts.find((account) => accountMatchesDestination(account, dest));
   const oauthDestinations = server
     ? destinations.filter((dest) => {
         if (!server.presentIn.includes(dest.id) || server.inlineCredentialsIn.includes(dest.id)) return false;
@@ -2977,7 +2977,7 @@ export function WorkspaceBody({
           ok ? toast.show("Sign-in link copied.", { variant: "success" }) : toast.show("Couldn't copy. The link above is selectable.", { variant: "warning" })
         }
         bare
-        onlyAccount={{ provider: account.provider, email: account.email }}
+        onlyAccount={{ provider: account.provider, email: account.email, dir: account.dir }}
       />
     ) : null;
   const workspaceStale = workspaceQuery.isError && Boolean(data);

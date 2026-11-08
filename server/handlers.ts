@@ -1490,7 +1490,9 @@ export type AccountOptions = {
   /** Ask Codex again now, whatever the cache says (Refresh, a finished sign-in). */
   force?: boolean;
   /** Only this account (the agent panel needs one). */
-  only?: { provider: string; email: string };
+  only?: { provider: string; email: string; dir?: string };
+  /** The same configs the page or agent loads, including derived providers. */
+  destinations?: readonly Destination[];
 };
 
 /**
@@ -1501,8 +1503,10 @@ export type AccountOptions = {
  * from a background check. No process is started on this path.
  */
 export function collectAccounts(options: AccountOptions): McpAuthAccount[] {
-  const wanted = (provider: string, email: string) =>
-    !options.only || (options.only.provider === provider && options.only.email === email);
+  const directoryKey = (dir: string) => process.platform === "win32" ? resolve(dir).toLowerCase() : resolve(dir);
+  const wanted = (provider: string, email: string, dir: string) =>
+    !options.only || (options.only.provider === provider && options.only.email === email && (!options.only.dir || directoryKey(options.only.dir) === directoryKey(dir)));
+  const destinations = options.destinations ?? [];
   const readNeeds = (dir: string): string[] => {
     const data = readJsonShared(join(dir, "mcp-needs-auth-cache.json"));
     return data ? Object.keys(data) : [];
@@ -1555,36 +1559,57 @@ export function collectAccounts(options: AccountOptions): McpAuthAccount[] {
   // Codex account counts for that, even when only one Claude account was asked for (the agent
   // panel); those are read from files only, never by asking Codex.
   const codexAll: Array<{ account: McpAuthAccount; keep: boolean }> = [];
+  const codexDirs = new Set<string>();
+  const addCodex = (email: string, dir: string, isPrimary: boolean) => {
+    const key = directoryKey(dir);
+    if (codexDirs.has(key)) return;
+    codexDirs.add(key);
+    const keep = wanted("codex", email, dir);
+    codexAll.push({ account: codex(email, dir, isPrimary, keep && options.askCodex), keep });
+  };
   const primaryCodexDir = join(HOME, ".codex");
   const primaryCodexEmail = codexAccountEmail(primaryCodexDir);
-  if (primaryCodexEmail) {
-    const keep = wanted("codex", primaryCodexEmail);
-    codexAll.push({ account: codex(primaryCodexEmail, primaryCodexDir, true, keep && options.askCodex), keep });
+  // MCP grants belong to this config directory, even when model access uses
+  // an API key or a local router and auth.json has no ChatGPT email.
+  if (primaryCodexEmail || existsSync(join(primaryCodexDir, "config.toml"))) {
+    addCodex(primaryCodexEmail, primaryCodexDir, true);
+  }
+  for (const dest of destinations) {
+    if (dest.provider === "codex") addCodex(dest.account, dirname(dest.configPath), false);
   }
   for (const slot of slots) {
     // The destination is keyed by the slot name. The Agents tab separately
     // flags a slot whose authenticated email does not match that name.
-    if (slot.provider !== "codex" || !slot.loggedIn) continue;
-    const keep = wanted("codex", slot.email);
-    codexAll.push({ account: codex(slot.email, slot.dir, false, keep && options.askCodex), keep });
+    if (slot.provider !== "codex" || (!slot.loggedIn && !existsSync(join(slot.dir, "config.toml")))) continue;
+    addCodex(slot.email, slot.dir, false);
   }
   const codexAccounts = codexAll.filter((entry) => entry.keep).map((entry) => entry.account);
-  const claudeDirs = [claudePrimaryDir(), ...slots.filter((slot) => slot.provider === "claude").map((slot) => slot.dir)];
+  const claudeDirs = [claudePrimaryDir(), ...slots.filter((slot) => slot.provider === "claude").map((slot) => slot.dir), ...destinations.filter((dest) => dest.provider === "claude").map((dest) => dirname(dest.configPath))];
   const oauthElsewhere = new Set<string>([
     ...codexAll.flatMap(({ account }) => Object.entries(account.authStatus).filter(([, state]) => state === "connected" || state === "not-connected").map(([name]) => name)),
     ...claudeDirs.flatMap((dir) => (claudeGrants(dir) ?? []).map((grant) => grant.serverName)),
   ]);
 
   const accounts: McpAuthAccount[] = [];
+  const seenClaudeDirs = new Set<string>();
+  const addClaude = (email: string, dir: string, configPath: string, isPrimary: boolean) => {
+    const key = directoryKey(dir);
+    if (seenClaudeDirs.has(key)) return;
+    seenClaudeDirs.add(key);
+    if (wanted("claude", email, dir)) accounts.push(claude(email, dir, configPath, isPrimary, oauthElsewhere));
+  };
   // 0.20.1: Claude is listed even with no Anthropic account signed in (Claude that runs through a
   // router, say). Its connector sign-ins are its own, kept apart from that login, and every Claude
   // chat on this computer uses them. Before, no email meant no Claude sign-in rows at all.
   const primaryEmail = claudeAccountEmail(HOME);
-  if ((primaryEmail || existsSync(claudePrimaryConfig())) && wanted("claude", primaryEmail)) {
-    accounts.push(claude(primaryEmail, claudePrimaryDir(), claudePrimaryConfig(), true, oauthElsewhere));
+  if (primaryEmail || existsSync(claudePrimaryConfig())) {
+    addClaude(primaryEmail, claudePrimaryDir(), claudePrimaryConfig(), true);
+  }
+  for (const dest of destinations) {
+    if (dest.provider === "claude" && dest.configPath !== claudePrimaryConfig()) addClaude(dest.account, dirname(dest.configPath), dest.configPath, false);
   }
   for (const slot of slots) {
-    if (slot.provider === "claude" && wanted("claude", slot.email)) accounts.push(claude(slot.email, slot.dir, join(slot.dir, ".claude.json"), false, oauthElsewhere));
+    if (slot.provider === "claude") addClaude(slot.email, slot.dir, join(slot.dir, ".claude.json"), false);
   }
   return [...accounts, ...codexAccounts];
 }
@@ -1593,7 +1618,8 @@ export async function handleMcpAuth(
   input: { refresh?: boolean } = {},
   context?: PluginHandlerContext,
 ) {
-  const accounts = collectAccounts({ askCodex: true, force: input.refresh === true });
+  const destinations = await buildDestinations(context?.paseo ?? null);
+  const accounts = collectAccounts({ askCodex: true, force: input.refresh === true, destinations });
   const projectServers: Array<{ project: string; name: string; path: string }> = [];
   // Refresh re-reads the project list too, in the background: this read answers from the last copy.
   if (input.refresh === true) refreshDaemonReads("projects");

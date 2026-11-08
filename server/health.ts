@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { claudeOffIn, tomlSwitchedOff, type SignInNeed } from "../shared/attention";
 import { BUILT_IN_LABEL, isCodexBuiltIn } from "../shared/builtin";
-import { healthIsSignIn, healthNeedsAttention, resultNeedsAttention, type McpAuthAccount, type McpHealth, type McpHealthReport, type McpHealthScope } from "../shared/contracts";
+import { healthIsSignIn, healthNeedsAttention, resultNeedsAttention, type Destination, type McpAuthAccount, type McpHealth, type McpHealthReport, type McpHealthScope } from "../shared/contracts";
 import { HEALTH_DEFAULTS, healthSettings, type HealthSettings } from "../shared/settings";
 import { mapLimit } from "../shared/tools";
 import { backgroundPass } from "./background";
@@ -132,16 +132,18 @@ let readPassFailedAt = 0;
  * until this run's first pass: then a primary account maps to its own name.
  */
 let providersByConfig: Map<string, string[]> | null = null;
+let destinationsForAccounts: readonly Destination[] | null = null;
 let signInMemo: { at: number; value: SignInNeed[] } | null = null;
 const SIGN_IN_MEMO_MS = 15_000;
 
-function rememberProviders(destinations: ReadonlyArray<{ configPath: string; providerId: string }>): void {
+function rememberProviders(destinations: readonly Destination[]): void {
   const map = new Map<string, string[]>();
   for (const dest of destinations) {
     if (!dest.providerId) continue;
     map.set(dest.configPath, [...(map.get(dest.configPath) ?? []), dest.providerId]);
   }
   providersByConfig = map;
+  destinationsForAccounts = destinations;
   signInMemo = null;
 }
 
@@ -152,7 +154,7 @@ function accountConfigPath(account: McpAuthAccount): string {
 }
 
 /** Connectors an account still has to sign in to, from each editor's own files (never by asking Codex), for the composer chip. */
-export function signInNeeds(accounts: readonly McpAuthAccount[] = collectAccounts({ askCodex: false })): SignInNeed[] {
+export function signInNeeds(accounts: readonly McpAuthAccount[] = collectAccounts({ askCodex: false, destinations: destinationsForAccounts ?? undefined })): SignInNeed[] {
   const needs = new Map<string, Set<string>>();
   for (const account of accounts) {
     const providerIds = providersByConfig ? (providersByConfig.get(accountConfigPath(account)) ?? []) : account.isPrimary ? [account.provider] : [];

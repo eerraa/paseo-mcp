@@ -10,9 +10,25 @@
  * Anything else needs Codex itself, which checks the keyring and asks each
  * server over the network whether it speaks OAuth (5 s per server).
  */
-import type { McpAuthAccount } from "./contracts";
+import type { Destination, McpAuthAccount } from "./contracts";
 
 export type AuthState = McpAuthAccount["authStatus"][string];
+
+/** Match the config directory, since two profiles can use the same model email. */
+export function accountMatchesDestination(account: Pick<McpAuthAccount, "provider" | "dir" | "isPrimary" | "configDirEnv">, destination: Pick<Destination, "provider" | "configPath">): boolean {
+  if (account.provider !== destination.provider) return false;
+  const dir = account.dir.replace(/\\/g, "/").replace(/\/+$/, "");
+  const file = account.provider === "codex"
+    ? `${dir}/config.toml`
+    : account.isPrimary && !account.configDirEnv
+      ? `${dir.slice(0, dir.lastIndexOf("/"))}/.claude.json`
+      : `${dir}/.claude.json`;
+  const key = (path: string) => {
+    const normalized = path.replace(/\\/g, "/");
+    return /^[a-z]:\//i.test(normalized) || normalized.startsWith("//") ? normalized.toLowerCase() : normalized;
+  };
+  return key(file) === key(destination.configPath);
+}
 
 /** Codex refreshes a token this long before it expires; the same margin applies here. */
 const REFRESH_SKEW_MS = 30_000;

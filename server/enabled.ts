@@ -26,6 +26,8 @@ import { readJsonCached } from "./files";
 import {
   backupFile,
   buildDestinations,
+  claudePrimaryConfig,
+  claudePrimaryDir,
   collectAccounts,
   destRead,
   hasInlineCredentials,
@@ -183,7 +185,8 @@ export async function handleMcpAgentServers(
   // from memory; a background refresh starts when the last answer is old).
   let account: McpAuthAccount | null = null;
   if (dest && (dest.provider === "claude" || dest.provider === "codex")) {
-    const accounts = collectAccounts({ askCodex: probe && dest.provider === "codex", only: { provider: dest.provider, email: dest.account } });
+    const dir = dest.provider === "claude" && dest.configPath === claudePrimaryConfig() ? claudePrimaryDir() : dirname(dest.configPath);
+    const accounts = collectAccounts({ askCodex: probe && dest.provider === "codex", destinations, only: { provider: dest.provider, email: dest.account, dir } });
     account = accounts[0] ?? null;
   }
 

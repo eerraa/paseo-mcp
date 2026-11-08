@@ -1,11 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { claudeGrantsFrom, claudeStates, claudeStoredGrants, codexCliState, loginCommand, codexStatesFromGrants, codexStoredGrants, mergeCodexStates, parseCodexMcpList } from "../shared/accounts";
+import { accountMatchesDestination, claudeGrantsFrom, claudeStates, claudeStoredGrants, codexCliState, loginCommand, codexStatesFromGrants, codexStoredGrants, mergeCodexStates, parseCodexMcpList } from "../shared/accounts";
 import { plainError } from "../shared/errors";
 import { backoffMs, clockTime } from "../shared/schedule";
 
 const NOW = Date.UTC(2026, 8, 23, 4, 0, 0);
 const HOUR = 3_600_000;
+
+test("connector accounts match config files, independently of model emails and Windows path separators", () => {
+  const primary = { provider: "codex" as const, dir: "C:\\Users\\demo\\.codex", isPrimary: true };
+  const derived = { provider: "codex" as const, dir: "C:\\Users\\demo\\.paseo\\codex-aistudio", isPrimary: false };
+  const destination = { provider: "codex", configPath: "c:/users/demo/.paseo/codex-aistudio/config.toml" };
+  assert.equal(accountMatchesDestination(primary, destination), false);
+  assert.equal(accountMatchesDestination(derived, destination), true);
+  const claude = { provider: "claude" as const, dir: "/home/demo/.claude", isPrimary: true };
+  assert.equal(accountMatchesDestination(claude, { provider: "claude", configPath: "/home/demo/.claude.json" }), true);
+  assert.equal(accountMatchesDestination({ ...claude, configDirEnv: claude.dir }, { provider: "claude", configPath: "/home/demo/.claude/.claude.json" }), true);
+  assert.equal(accountMatchesDestination({ ...claude, isPrimary: false, dir: "/profiles/work" }, { provider: "claude", configPath: "/profiles/work/.claude.json" }), true);
+  assert.equal(accountMatchesDestination(claude, { provider: "claude", configPath: "/home/Demo/.claude.json" }), false, "POSIX paths remain case-sensitive");
+});
 
 test("Codex auth_status values map the way Codex serializes them (o_auth is connected)", () => {
   assert.equal(codexCliState("o_auth"), "connected");

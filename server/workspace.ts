@@ -109,9 +109,11 @@ export async function handleMcpWorkspace(
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
-  // The panel shows Claude sign-in rows only, so no Codex check is started from here.
-  const accounts = collectAccounts({ askCodex: false });
   const destinations = await buildDestinations(paseo);
+  // The panel shows Claude sign-in rows only, so no Codex check is started from here.
+  // Pass the destinations so derived Codex profiles (for example AIStudio) keep
+  // their own MCP grants instead of disappearing from the account read.
+  const accounts = collectAccounts({ askCodex: false, destinations });
   const { profile, defs } = buildProfile(destinations, definitions, configPath, candidates);
   const paseoTools = await paseoToolsLoad(paseo, destinations.map((dest) => dest.providerId));
   const toolSearch = await toolSearchVerdicts(paseo, destinations.map((dest) => ({ id: dest.providerId, base: dest.provider })), { directory });

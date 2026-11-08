@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Fixed
+- **Codex connector sign-ins disappeared with API keys and derived profiles.** MCP accounts are now discovered from their config directories even when there is no model account email. Profiles such as AIStudio use their own `CODEX_HOME` for sign-in checks, and the page and agent panels match grants by config path so one profile cannot hide another profile's missing sign-in.
 - **Windows: a program given by its full path showed as "Not installed".** `D:\Apps\tool\tool.exe` has no `/`, so it was looked up as a name on PATH. Backslash paths are now checked as files, and PATH lookups try the PATHEXT extensions instead of matching npm's extensionless sh shim.
 - **Windows: Codex sign-ins were never read.** The plugin found npm's `codex` sh shim, which Windows can't run, so every Codex sign-in read failed. It now runs `codex.cmd` through `cmd.exe /d /s /c` with quoted arguments.
 - **The Overview counted a "just for you" copy as missing from some apps.** A connector set up only as Claude Code's project copy is in no app on purpose, and the Connectors filter already skipped it; the Overview row, the header pill and the Copy card did not, and offered to copy something the copy plan never includes. All three now share `isAppGap()`.
